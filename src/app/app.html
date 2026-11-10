@@ -1,0 +1,65 @@
+<section class="login-screen" *ngIf="!loggedIn">
+  <form class="login-card" (ngSubmit)="login()">
+    <div class="brand"><span class="brand-mark">M</span><strong>M'Vente</strong></div>
+    <p class="eyebrow">ESPACE PROFESSIONNEL</p>
+    <h1>Bienvenue sur M'Vente</h1>
+    <p class="muted">Connectez-vous pour gérer vos ventes et vos commandes.</p>
+    <label>Adresse e-mail</label><input name="email" type="email" [(ngModel)]="email" required placeholder="exemple@entreprise.com">
+    <label>Mot de passe</label><input name="password" type="password" [(ngModel)]="password" required placeholder="Votre mot de passe">
+    <div class="role-options">
+      <button type="button" [class.selected]="role === 'seller'" (click)="role = 'seller'">♙ <span>Vendeur<small>Choisir les produits</small></span></button>
+      <button type="button" [class.selected]="role === 'admin'" (click)="role = 'admin'">▣ <span>Administrateur<small>Gérer les commandes</small></span></button>
+    </div>
+    <button class="primary" type="submit" [disabled]="loading">Se connecter →</button>
+    <p class="error">{{ loginError }}</p>
+  </form>
+</section>
+
+<div class="shell" *ngIf="loggedIn">
+  <aside class="sidebar">
+    <div class="brand"><span class="brand-mark">M</span><strong>M'Vente</strong></div>
+    <p class="side-label">Espace de travail</p>
+    <button *ngIf="role === 'admin'" class="nav" [class.active]="activePage === 'dashboard'" (click)="activePage = 'dashboard'">⌂ Tableau de bord</button>
+    <button class="nav active" [class.active]="activePage === 'sales'" (click)="activePage = 'sales'">▣ Ventes</button>
+    <button *ngIf="role === 'admin'" class="nav" [class.active]="activePage === 'admin'" (click)="activePage = 'admin'">⚙ Administration</button>
+    <button class="logout" (click)="logout()">Déconnexion</button>
+  </aside>
+  <main class="content">
+    <header><span>Mon espace / <strong>{{ activePage === 'admin' ? 'Administration' : activePage === 'dashboard' ? 'Tableau de bord' : 'Nouvelle vente' }}</strong></span><button class="mobile-logout" (click)="logout()">Quitter</button></header>
+
+    <section *ngIf="activePage === 'dashboard'" class="page">
+      <p class="eyebrow">CENTRE DE CONTRÔLE</p><h1>Tableau de bord ✦</h1><p class="muted">Suivez l'activité de votre équipe et vos résultats.</p>
+      <div class="stats"><article><span>Ventes du jour</span><strong>24 850 DH</strong></article><article><span>Commandes en attente</span><strong>{{ orders.length }}</strong></article><article><span>Produits en stock</span><strong>{{ products.length }}</strong></article></div>
+    </section>
+
+    <section *ngIf="activePage === 'sales'" class="page">
+      <p class="eyebrow">NOUVELLE COMMANDE</p><h1>Bonjour 👋</h1><p class="muted">Choisissez les produits demandés par votre client.</p>
+      <div class="sales-history"><div class="section-title"><h2>Mes ventes</h2><select [(ngModel)]="orderFilter"><option value="all">Toutes</option><option value="pending">En cours</option><option value="confirmed">Confirmées</option></select></div>
+        <div *ngFor="let order of sellerOrders" class="sale-row"><div><strong>{{ order.id }}</strong><span>{{ order.client }}</span></div><strong>{{ money(order.total) }}</strong><span class="status">{{ order.status === 'pending' ? 'En cours' : 'Confirmée' }}</span></div>
+      </div>
+      <div class="catalog-layout"><section class="panel"><div class="section-title"><div><h2>Choisir les produits</h2><p class="muted">Ajoutez les produits demandés.</p></div><input [(ngModel)]="search" placeholder="Rechercher..."></div>
+        <div class="categories"><button [class.active]="category === 'all'" (click)="category = 'all'">Tous</button><button *ngFor="let item of categories" [class.active]="category === item.id" (click)="category = item.id">{{ item.name }}</button></div>
+        <div class="products"><article *ngFor="let product of visibleProducts" class="product"><button type="button" class="product-image" (click)="openImage(product)" [style.backgroundImage]="product.image ? 'url(' + product.image + ')' : ''">{{ product.image ? '' : product.emoji }}</button><strong>{{ product.name }}</strong><small>{{ product.detail }}</small><b>{{ money(product.price) }}</b><button type="button" class="add" [disabled]="product.stock === 0" (click)="addToCart(product)">+</button></article></div>
+      </section>
+      <aside class="cart panel"><h2>Commande en cours</h2><input [(ngModel)]="clientName" placeholder="Nom du client"><div *ngFor="let item of cart" class="cart-row"><span>{{ item.name }} × {{ item.quantity }}</span><strong>{{ money(item.price * item.quantity) }}</strong><button (click)="changeQuantity(item, -1)">−</button></div><div class="total">Total <strong>{{ money(total) }}</strong></div><button class="primary" [disabled]="!cart.length" (click)="sendOrder()">Envoyer à l'administration →</button></aside></div>
+    </section>
+
+    <section *ngIf="activePage === 'admin'" class="page">
+      <p class="eyebrow">CENTRE DE CONTRÔLE</p><h1>Administration ✦</h1><p class="muted">Gérez commandes, stock et équipe.</p>
+      <div class="tabs"><button [class.active]="activeAdminTab === 'orders'" (click)="activeAdminTab = 'orders'">Commandes</button><button [class.active]="activeAdminTab === 'history'" (click)="activeAdminTab = 'history'">Historique vendeurs</button><button [class.active]="activeAdminTab === 'products'" (click)="activeAdminTab = 'products'">Produits & stock</button><button [class.active]="activeAdminTab === 'sellers'" (click)="activeAdminTab = 'sellers'">Vendeurs</button></div>
+      <section class="panel" *ngIf="activeAdminTab === 'orders'"><div *ngFor="let order of orders" class="admin-row"><span>{{ order.id }} · {{ order.client }}</span><span>{{ order.seller }}</span><strong>{{ money(order.total) }}</strong><button *ngIf="order.status === 'pending'" class="secondary" (click)="confirm(order)">Confirmer</button></div></section>
+      <section class="panel" *ngIf="activeAdminTab === 'history'"><div *ngFor="let order of orders" class="admin-row"><span>{{ order.seller }}<small>{{ order.id }} · {{ order.client }}</small></span><strong>{{ money(order.total) }}</strong><span>{{ order.status === 'pending' ? 'En cours' : 'Confirmée' }}</span></div></section>
+      <section class="panel" *ngIf="activeAdminTab === 'products'"><form class="admin-form" (ngSubmit)="addProduct()"><input name="name" [(ngModel)]="newProduct.name" placeholder="Produit" required><input name="detail" [(ngModel)]="newProduct.detail" placeholder="Détail"><input name="price" type="number" [(ngModel)]="newProduct.price" placeholder="Prix"><input name="stock" type="number" [(ngModel)]="newProduct.stock" placeholder="Stock"><select name="category" [(ngModel)]="newProduct.category"><option *ngFor="let item of categories" [value]="item.id">{{ item.name }}</option></select><button class="primary">Ajouter</button></form><form class="admin-form" (ngSubmit)="addCategory()"><input name="categoryName" [(ngModel)]="newCategory" placeholder="Nouvelle catégorie"><button class="secondary">Ajouter catégorie</button></form><div *ngFor="let product of products" class="admin-row"><span>{{ product.name }}</span><input type="number" [(ngModel)]="product.stock" (change)="saveAdminState()"><button class="danger" (click)="deleteProduct(product)">Supprimer</button></div></section>
+      <section class="panel" *ngIf="activeAdminTab === 'sellers'"><form class="admin-form" (ngSubmit)="addSeller()"><input name="sellerName" [(ngModel)]="newSeller.name" placeholder="Nom"><input name="sellerEmail" [(ngModel)]="newSeller.email" placeholder="E-mail"><input name="sellerPassword" [(ngModel)]="newSeller.password" type="password" placeholder="Mot de passe"><button class="primary">Créer</button></form><div *ngFor="let seller of sellers" class="admin-row"><span>{{ seller.name }}<small>{{ seller.email }}</small></span><button class="danger" (click)="deleteSeller(seller)">Supprimer</button></div></section>
+    </section>
+  </main>
+</div>
+
+<div class="invoice-modal" *ngIf="invoice">
+  <article class="invoice"><div class="invoice-header"><div class="brand"><span class="brand-mark">M</span><strong>M'Vente</strong></div><button (click)="invoice = null">×</button></div><p>FACTURE {{ invoice.id }}</p><h3>Client : {{ invoice.client }}</h3><table><tr><th>Produit</th><th>Quantité</th><th>Prix</th><th>Total</th></tr><tr *ngFor="let item of invoice.items"><td>{{ item.name }}</td><td>{{ item.quantity }}</td><td>{{ money(item.price) }}</td><td>{{ money(item.price * item.quantity) }}</td></tr></table><h2>Total : {{ money(invoice.total) }}</h2><button class="primary" (click)="print()">Imprimer</button></article>
+</div>
+
+<div class="image-modal" *ngIf="imagePreview" (click)="imagePreview = null">
+  <button type="button" class="image-close" (click)="imagePreview = null" aria-label="Fermer">×</button>
+  <img [src]="imagePreview.image" [alt]="imagePreview.name" (click)="$event.stopPropagation()">
+</div>
