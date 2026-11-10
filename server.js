@@ -6,10 +6,13 @@ const { URL } = require("node:url");
 
 const PORT = Number(process.env.PORT || 3000);
 const DATA_FILE = path.join(__dirname, "data", "mvente.enc");
+const DEVELOPMENT_KEY = "change-this-development-key";
 if (process.env.NODE_ENV === "production" && (!process.env.DATA_ENCRYPTION_KEY || !process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD)) {
   throw new Error("Production requires DATA_ENCRYPTION_KEY, ADMIN_EMAIL and ADMIN_PASSWORD.");
 }
-const KEY = crypto.createHash("sha256").update(process.env.DATA_ENCRYPTION_KEY || "change-this-development-key").digest();
+const configuredKey = process.env.DATA_ENCRYPTION_KEY || DEVELOPMENT_KEY;
+const KEY = crypto.createHash("sha256").update(configuredKey).digest();
+const DEVELOPMENT_CRYPTO_KEY = crypto.createHash("sha256").update(DEVELOPMENT_KEY).digest();
 const sessions = new Map();
 
 const seed = {
@@ -43,9 +46,9 @@ function encrypt(value) {
   return JSON.stringify({ iv: iv.toString("base64"), tag: cipher.getAuthTag().toString("base64"), data: encrypted.toString("base64") });
 }
 
-function decrypt(value) {
+function decrypt(value, key = KEY) {
   const payload = JSON.parse(value);
-  const decipher = crypto.createDecipheriv("aes-256-gcm", KEY, Buffer.from(payload.iv, "base64"));
+  const decipher = crypto.createDecipheriv("aes-256-gcm", key, Buffer.from(payload.iv, "base64"));
   decipher.setAuthTag(Buffer.from(payload.tag, "base64"));
   return JSON.parse(Buffer.concat([decipher.update(Buffer.from(payload.data, "base64")), decipher.final()]).toString("utf8"));
 }
@@ -57,7 +60,16 @@ function readState() {
     fs.writeFileSync(DATA_FILE, encrypt(state), "utf8");
     return state;
   }
-  return decrypt(fs.readFileSync(DATA_FILE, "utf8"));
+  const encrypted = fs.readFileSync(DATA_FILE, "utf8");
+  try {
+    return decrypt(encrypted);
+  } catch (error) {
+    if (process.env.NODE_ENV === "production" || configuredKey === DEVELOPMENT_KEY) throw error;
+    const state = decrypt(encrypted, DEVELOPMENT_CRYPTO_KEY);
+    writeState(state);
+    console.warn("Encrypted development data migrated to DATA_ENCRYPTION_KEY.");
+    return state;
+  }
 }
 
 function writeState(state) {
