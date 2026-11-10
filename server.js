@@ -5,7 +5,7 @@ const crypto = require("node:crypto");
 const { URL } = require("node:url");
 
 const PORT = Number(process.env.PORT || 3000);
-const DATA_FILE = process.env.DATA_FILE || (process.env.VERCEL ? path.join("/tmp", "mvente.enc") : path.join(__dirname, "data", "mvente.enc"));
+const DATA_FILE = path.join(__dirname, "data", "mvente.enc");
 if (process.env.NODE_ENV === "production" && (!process.env.DATA_ENCRYPTION_KEY || !process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD)) {
   throw new Error("Production requires DATA_ENCRYPTION_KEY, ADMIN_EMAIL and ADMIN_PASSWORD.");
 }
@@ -97,13 +97,12 @@ function session(request) {
   return token ? sessions.get(token) : null;
 }
 
-const handler = async (request, response) => {
+const server = http.createServer(async (request, response) => {
   try {
     const url = new URL(request.url, `http://${request.headers.host}`);
-    if (request.method === "GET" && ["/", "/index.html", "/app.js", "/styles.css", "/manifest.json", "/icon512_maskable.png", "/icon512_rounded.png"].includes(url.pathname)) {
+    if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html" || url.pathname === "/app.js" || url.pathname === "/styles.css")) {
       const file = url.pathname === "/" ? "index.html" : url.pathname.slice(1);
-      const contentType = file.endsWith(".js") ? "text/javascript" : file.endsWith(".css") ? "text/css" : file.endsWith(".json") ? "application/manifest+json" : file.endsWith(".png") ? "image/png" : "text/html";
-      response.writeHead(200, { "content-type": contentType });
+      response.writeHead(200, { "content-type": file.endsWith(".js") ? "text/javascript" : file.endsWith(".css") ? "text/css" : "text/html" });
       fs.createReadStream(path.join(__dirname, file)).pipe(response);
       return;
     }
@@ -160,10 +159,6 @@ const handler = async (request, response) => {
     console.error(error);
     reply(response, 500, { error: "Erreur serveur." });
   }
-};
+});
 
-if (require.main === module) {
-  http.createServer(handler).listen(PORT, () => console.log(`M'Vente server: http://localhost:${PORT}`));
-}
-
-module.exports = handler;
+server.listen(PORT, () => console.log(`M'Vente server: http://localhost:${PORT}`));
