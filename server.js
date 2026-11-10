@@ -109,7 +109,7 @@ function session(request) {
   return token ? sessions.get(token) : null;
 }
 
-const server = http.createServer(async (request, response) => {
+const requestHandler = async (request, response) => {
   try {
     const url = new URL(request.url, `http://${request.headers.host}`);
     if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html" || url.pathname === "/app.js" || url.pathname === "/styles.css")) {
@@ -171,6 +171,10 @@ const server = http.createServer(async (request, response) => {
     console.error(error);
     reply(response, 500, { error: "Erreur serveur." });
   }
-});
+};
 
-server.listen(PORT, () => console.log(`M'Vente server: http://localhost:${PORT}`));
+if (require.main === module) {
+  http.createServer(requestHandler).listen(PORT, () => console.log(`M'Vente server: http://localhost:${PORT}`));
+}
+
+module.exports = requestHandler;
